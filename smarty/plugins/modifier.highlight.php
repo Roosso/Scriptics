@@ -18,7 +18,7 @@
  *
  * @return string|string[]|null
  */
-function smarty_modifier_highlight(&$text='', $word='') {
+function smarty_modifier_highlight(string &$text='', string $word='') {
 
 	if($word) {
 		$word = preg_quote($word);

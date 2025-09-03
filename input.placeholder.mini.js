@@ -1,5 +1,4 @@
 /*
- * http://www.black-web.ru
  * http://habrahabr.ru/post/148945/
  * Пользуйтесь, если надо.
  */
