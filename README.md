@@ -68,7 +68,7 @@ $smarty->addPluginsDir(__DIR__.'/smarty_plugins');
 
 1. **Скачайте файлы:**
    ```bash
-   git clone https://github.com/your-repo/scriptics.git
+   git clone https://github.com/Roosso/scriptics.git
    cd scriptics
    ```
 
