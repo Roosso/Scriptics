@@ -126,9 +126,11 @@ Options All -ExecCGI -Indexes -Includes +FollowSymLinks
 	# 	Блокировать любой запрос, содержащий тег <iframe> в URL
 	RewriteCond %{QUERY_STRING} (<|%3C).*iframe.*(>|%3E) [NC,OR]
 	# 	Блокировать любой запрос, содержащий jacascript в URL
-	RewriteCond %{QUERY_STRING} (javascript:).*(;).* [NC]
+	RewriteCond %{QUERY_STRING} (javascript:).*(;).* [NC,OR]
 	# 	Блокировать любой запрос, содержащий попытку инъекции БД в URL
-	RewriteCond %{QUERY_STRING} (;|'|"|%22).*(union|select|insert|drop|update|md5|benchmark|or|and|if).* [NC]
+	RewriteCond %{QUERY_STRING} (;|'|%27|"|%22).*\b(union(\s|\+|%20)+(all(\s|\+|%20)+)?select|select(\s|\+|%20|/\*).+from|insert(\s|\+|%20)+into|drop(\s|\+|%20)+(table|database)|update(\s|\+|%20).+set|(benchmark|sleep|md5)(\s|\+|%20)*\() [NC,OR]
+	#	Классическая инъекция вида ' or 1=1
+	RewriteCond %{QUERY_STRING} ('|%27)(\s|\+|%20)*(or|and)(\s|\+|%20)+[0-9a-z'"]+(\s|\+|%20)*=(\s|\+|%20)*[0-9a-z'"] [NC,OR]
 	#	Блокировать любой запрос, пытающийся установить значение глобальных переменных PHP через URL
 	RewriteCond %{QUERY_STRING} GLOBALS(=|\[|\%[0-9A-Z]{0,2}) [OR]
 	#	Блокировать любой запрос, пытающийся изменить _REQUEST переменную через URL

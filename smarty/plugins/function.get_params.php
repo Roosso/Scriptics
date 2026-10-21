@@ -41,10 +41,15 @@ function smarty_function_get_params(array $params) {
 	}
 
 	if($_GET) {
+		$entity = $noentity ? "&" : "&amp;";
 		foreach($_GET as $key=>$value) {
-			if(!in_array($key, $excludeParams)) {
-				$entity = $noentity ? "&" : "&amp;" ;
-				$output .= $entity.$key."=".$value;
+			if(!in_array((string) $key, $excludeParams, true)) {
+				// http_build_query url-encodes keys and values (arrays included),
+				// so user input can not break out of the attribute or inject markup
+				$query = http_build_query(array($key => $value), '', $entity, PHP_QUERY_RFC3986);
+				if($query !== '') {
+					$output .= $entity.$query;
+				}
 			}
 		}
 	}

@@ -13,11 +13,9 @@
  *
  * @param string $text - text fo handle
  *
- * @return string|string[]|null
+ * @return string
  */
-function smarty_modifier_topsecret(string &$text='') {
+function smarty_modifier_topsecret(string $text='') {
 
-	$text = preg_replace('/(\pL)/iu', '&#9618;', $text);
-
-	return($text);
+	return preg_replace('/\pL/u', '&#9618;', $text) ?? $text;
 }

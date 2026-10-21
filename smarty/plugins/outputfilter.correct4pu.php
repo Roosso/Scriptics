@@ -1,12 +1,14 @@
 <?php
 /**
- * Smarty postfilter
+ * Smarty output filter
  *
- * Type:     filter
- * Name:     correct_4pu
+ * Type:     outputfilter
+ * Name:     correct4pu
  * Purpose:  correct href
  *
- * @param array                    $tpl_source
+ * Register: $smarty->loadFilter('output', 'correct4pu');
+ *
+ * @param array $tpl_source
  *
  * @return array
  * @author Jambik <> idea and creations
@@ -17,19 +19,18 @@ function smarty_outputfilter_correct4pu(array $tpl_source) {
 
 	$uri_separator = '/';
 
-	preg_match_all("/<[Aa][\s]{1}[^>]*[Hh][Rr][Ee][Ff][^=]*=[ '\"\s]*([^ \"'>\s#]+)[^>]*>/", $tpl_source, $matches);
+	// only the href value of local links (starting with a single "/") is touched
+	$correct = function(array $m) use ($uri_separator) {
+		return $m[1].strtr($m[2], array('&amp;' => $uri_separator,
+						'?'     => $uri_separator,
+						'&'     => $uri_separator,
+						'='     => $uri_separator));
+	};
 
-	$urls = $matches[1];
-
-	foreach($urls AS $value) {
-
-		if(substr($value, 0, 1) == "/") {
-			$od = $value;
-			$rd = strtr($value, array('?' => $uri_separator,
-						  '&' => $uri_separator,
-						  '=' => $uri_separator));
-
-			$tpl_source = str_ireplace($od, $rd, $tpl_source);
+	// $tpl_source is an array: every element is processed, keys are preserved
+	foreach($tpl_source as $key => $source) {
+		if(is_string($source)) {
+			$tpl_source[$key] = preg_replace_callback("/(<a\s[^>]*?href\s*=\s*[\"']?)(\/(?!\/)[^\"'>\s#]*)/i", $correct, $source) ?? $source;
 		}
 	}
 
