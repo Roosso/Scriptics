@@ -15,6 +15,25 @@ Options All -ExecCGI -Indexes -Includes +FollowSymLinks
 	RewriteRule (.*) http://www.roocms.com/$1 [R=301,L]
 	RewriteCond %{THE_REQUEST} ^[A-Z]{3,9}\ /index\.php\ HTTP/
 	RewriteRule ^index\.php$ http://www.roocms.com/ [R=301,L]
+
+	#	Редиректы, которые должны сохранять путь запроса ($1), обязательно ставьте ВЫШЕ правила с index.php:
+	#	после него путь уже будет переписан в "index.php".
+
+	#	Переезд на новый домен с сохранением путей и параметров запроса
+	# RewriteCond %{HTTP_HOST} ^(www\.)?old-domain\.example$ [NC]
+	# RewriteRule ^(.*)$ https://new-domain.example/$1 [R=301,L]
+
+	#	Убрать слэш в конце URL: /news/ -> /news (для существующих папок слэш остаётся)
+	# RewriteCond %{REQUEST_FILENAME} !-d
+	# RewriteCond %{REQUEST_URI} (.+)/$
+	# RewriteRule ^ %1 [R=301,L]
+
+	#	Либо наоборот, добавить слэш для папок: /docs -> /docs/
+	#	(обычно это уже делает mod_dir через DirectorySlash On)
+	# RewriteCond %{REQUEST_FILENAME} -d
+	# RewriteCond %{REQUEST_URI} !/$
+	# RewriteRule ^(.*)$ /$1/ [R=301,L]
+
 	RewriteCond %{REQUEST_FILENAME} !-f
 	RewriteCond %{REQUEST_FILENAME} !-d
 	RewriteRule ^(.*)$ index.php [L,QSA]
@@ -149,10 +168,95 @@ Options All -ExecCGI -Indexes -Includes +FollowSymLinks
 </IfModule>
 
 
+# PROTECT ___________________
+#	Закрываем служебные файлы и папки, которые часто случайно оказываются в корне сайта.
+#	Блоки закомментированы: раскомментируйте то, что вам нужно.
+
+#	Системы контроля версий: .git, .svn, .hg (папки закрываются по пути, а не по имени файла)
+# RedirectMatch 404 /\.(git|svn|hg)(/|$)
+
+#	Служебные файлы: .env, .htpasswd, дампы, бэкапы, логи, менеджеры пакетов
+# <IfModule mod_authz_core.c>
+# 	# Apache 2.4
+# 	<FilesMatch "^(\.env.*|\.htpasswd|composer\.(json|lock)|package(-lock)?\.json)$|\.(sql|bak|old|orig|swp|log|ini)$">
+# 		Require all denied
+# 	</FilesMatch>
+# </IfModule>
+# <IfModule !mod_authz_core.c>
+# 	# Apache 2.2
+# 	<FilesMatch "^(\.env.*|\.htpasswd|composer\.(json|lock)|package(-lock)?\.json)$|\.(sql|bak|old|orig|swp|log|ini)$">
+# 		Order allow,deny
+# 		Deny from all
+# 	</FilesMatch>
+# </IfModule>
+
+#	Запретить исполнение скриптов в папках загрузок (uploads, files).
+#	Вариант 1: правилом из корня сайта
+# <IfModule mod_rewrite.c>
+# 	RewriteRule ^(uploads|files)/.*\.(php\d?|phtml|phar|pl|py|cgi|html?)$ - [F,NC,L]
+# </IfModule>
+#	Вариант 2: отдельный .htaccess внутри uploads/ со строками:
+#		<IfModule mod_php.c>
+#			php_flag engine off
+#		</IfModule>
+#		RemoveHandler .php .phtml .html .htm
+#		RemoveType .php .phtml
+#	Внимание: из-за "AddHandler ... .html" (см. раздел HANDLER) загруженный .html-файл
+#	исполнялся бы как PHP, поэтому .html тоже закрыт или сбрасывается через RemoveHandler.
+
+#	Закрыть папку паролем (HTTP Basic) на примере админки acp/
+#	Положите в acp/.htaccess (работает в Apache 2.2 и 2.4):
+#		AuthType Basic
+#		AuthName "Restricted area"
+#		AuthUserFile /home/user/.htpasswd
+#		Require valid-user
+#	Файл паролей создаётся командой: htpasswd -c /home/user/.htpasswd admin
+#	и должен лежать ВНЕ корня сайта.
+#	Если acp/ — это не физическая папка, а виртуальный адрес (обрабатывается через index.php),
+#	файл внутри неё не сработает. Тогда из корня (только Apache 2.4):
+# <If "%{REQUEST_URI} =~ m#^/acp(/|$)#">
+# 	AuthType Basic
+# 	AuthName "Restricted area"
+# 	AuthUserFile /home/user/.htpasswd
+# 	Require valid-user
+# </If>
+
+#	Ограничить доступ по IP (например, к acp/). Тоже кладётся в acp/.htaccess.
+# <IfModule mod_authz_core.c>
+# 	# Apache 2.4
+# 	Require ip 203.0.113.10 192.168.0.0/24
+# </IfModule>
+# <IfModule !mod_authz_core.c>
+# 	# Apache 2.2
+# 	Order deny,allow
+# 	Deny from all
+# 	Allow from 203.0.113.10 192.168.0.
+# </IfModule>
+
+#	Методы TRACE и TRACK
+#	Из .htaccess их закрыть нельзя: в Apache 2.4 метод TRACE обрабатывает само ядро, и правила
+#	RewriteRule / LimitExcept его не останавливают (проверено на Apache 2.4.63).
+#	Отключается только в конфигурации сервера (httpd.conf или настройки хостинга):
+#		TraceEnable off
+
+
+# MAINTENANCE _______________
+#	Режим обслуживания: всем, кроме вашего IP, отдаётся код 503 и страница maintenance.html.
+#	Поисковики понимают 503 как временную недоступность и не выкидывают сайт из выдачи.
+#	Чтобы включить, раскомментируйте блок и закомментируйте "ErrorDocument 503" в конце файла.
+# <IfModule mod_rewrite.c>
+# 	RewriteCond %{REMOTE_ADDR} !^203\.0\.113\.10$
+# 	RewriteCond %{REQUEST_URI} !^/maintenance\.html$
+# 	RewriteCond %{REQUEST_URI} !\.(css|js|gif|jpe?g|png|svg|ico|woff2?)$ [NC]
+# 	RewriteRule ^ - [R=503,L]
+# 	ErrorDocument 503 /maintenance.html
+# </IfModule>
+
+
 # HOTLINKING ________________
 <IfModule mod_rewrite.c>
 	# RewriteCond %{HTTP_REFERER} !^$
-	# RewriteCond %{HTTP_REFERER} !^http://([ -a-z0-9]  \.)?ibog\.su [NC]
+	# RewriteCond %{HTTP_REFERER} !^http://([-a-z0-9]+\.)?roocms\.com [NC]
 	# RewriteRule \.(gif|jpe?g|png)$ - [F,NC,L]
 </IfModule>
 
@@ -160,7 +264,7 @@ Options All -ExecCGI -Indexes -Includes +FollowSymLinks
 # HANDLER ___________________
 <IfModule mod_mime.c>
 	AddHandler application/x-httpd-php .html
-	AddHandler cgi-script .pl .py .jsp .asp .htm .shtml .sh .cgi
+	AddHandler cgi-script .pl .py .jsp .asp .shtml .sh .cgi
 	AddType application/x-javascript .js
 	AddType application/json .json
 	AddType text/css .css
@@ -210,20 +314,7 @@ DirectoryIndex index.php
 
 
 # GZIP ______________________
-<IfModule mod_gzip.c>
-	mod_gzip_on         Yes
-	mod_gzip_dechunk    Yes
-	mod_gzip_item_include file	\.(html?|txt|css|js|php|pl)$
-	mod_gzip_item_include handler   ^cgi-script$
-	mod_gzip_item_include mime	^text\.*
-	mod_gzip_item_include mime	^application/x-javascript.*
-	mod_gzip_item_include mime	^application/x-font-woff.*
-	mod_gzip_item_include mime	^application/x-font-woff2.*
-	mod_gzip_item_exclude mime	^image\.*
-	mod_gzip_item_exclude mime	^font\.*
-	mod_gzip_item_exclude rspheader	^Content-Encoding:.*gzip.*
-</IfModule>
-<ifModule mod_deflate.c>
+<IfModule mod_deflate.c>
 	AddOutputFilterByType DEFLATE application/javascript
 	AddOutputFilterByType DEFLATE application/rss+xml
 	AddOutputFilterByType DEFLATE application/vnd.ms-fontobject
@@ -251,7 +342,7 @@ DirectoryIndex index.php
 	AddOutputFilterByType DEFLATE text/javascript
 	AddOutputFilterByType DEFLATE text/plain
 	AddOutputFilterByType DEFLATE text/xml
-</ifModule>
+</IfModule>
 
 
 # PHP _______________________
@@ -282,12 +373,6 @@ DirectoryIndex index.php
 	# php_value error_prepend_string " "
 	# php_value error_append_string " "
 </IfModule>
-
-<Files php_error.log>
-	Order allow,deny
-	Deny from all
-	Satisfy All
-</Files>
 
 # With Apache 2.4 the "Order, Deny" syntax has been deprecated and moved from
 # module mod_authz_host to a new module called mod_access_compat (which may be
@@ -345,6 +430,13 @@ ServerSignature Off
 
 # CACHE AND Headers _________
 <IfModule mod_headers.c>
+	#безопасные заголовки (раскомментируйте нужные)
+	# Header always set X-Content-Type-Options "nosniff"
+	# Header always set X-Frame-Options "SAMEORIGIN"
+	# Header always set Referrer-Policy "strict-origin-when-cross-origin"
+	# Header unset X-Powered-By
+	#HSTS включайте только когда сайт полностью работает по HTTPS: браузеры запомнят это на срок max-age
+	# Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains" env=HTTPS
 	#кэшировать html и htm файлы на один день
 	<FilesMatch "\.(html|htm)$">
 		Header set Cache-Control "max-age=43200"
@@ -470,7 +562,15 @@ ServerSignature Off
 #	RewriteCond %{HTTP_USER_AGENT} .*Yanga.* [OR]
 #	RewriteCond %{HTTP_USER_AGENT} .*Yeti.*
 #	RewriteRule .* /index.php?page=e403 [F]
-#<IfModule>
+#</IfModule>
+
+# referer spam
+#	Блокировка ботов, подделывающих Referer (засоряют статистику посещаемости)
+#<IfModule mod_rewrite.c>
+#	RewriteEngine On
+#	RewriteCond %{HTTP_REFERER} (semalt\.com|buttons-for-website\.com|darodar\.com|ilovevitaly\.com|floating-share-buttons\.com) [NC]
+#	RewriteRule .* - [F]
+#</IfModule>
 
 # Bad Rquest
 ErrorDocument 400 /index.php?page=e400
@@ -502,7 +602,8 @@ ErrorDocument 501 /index.php?page=notfound
 # Bad Gateway 
 ErrorDocument 502 /index.php?page=notfound
 
-# Service Unavailable 
+# Service Unavailable
+# Если включён режим обслуживания (см. раздел MAINTENANCE), закомментируйте эту строку.
 ErrorDocument 503 /index.php?page=notfound
 
 # Gateway Timeout
