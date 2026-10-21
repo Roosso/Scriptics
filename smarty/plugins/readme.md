@@ -53,7 +53,7 @@ $smarty->addPluginsDir(_LIB.'/smarty_plugins');
 
 #### Параметры
 
-- `prefix` - префикс перед строкой
+- `prefix` - префикс перед строкой (каждый параметр уже начинается с `&amp;`, поэтому для обычных ссылок префикс не нужен)
 - `suffix` - суффикс после строки
 - `exclude` - GET параметры, которые нужно исключить
 - `noentity` - использовать `&` вместо `&amp;`
@@ -61,7 +61,7 @@ $smarty->addPluginsDir(_LIB.'/smarty_plugins');
 #### Пример использования
 
 ```smarty
-<a href="index.php?page={$page}{get_params prefix='&amp;' exclude='page'}">{$page}</a>
+<a href="index.php?page={$page}{get_params exclude='page'}">{$page}</a>
 ```
 
 ---
